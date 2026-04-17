@@ -1692,6 +1692,24 @@ progress::-moz-progress-bar { background: var(--violet) }
     background: var(--muted-bg);
 }
 
+/* 新建文件夹 —— 位于 footer 之上 */
+.browser-mkdir {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 14px;
+    border-top: 2px dashed var(--ink);
+    background: var(--paper);
+}
+.browser-mkdir input {
+    flex: 1;
+    min-width: 0;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+}
+.browser-mkdir button { padding: 6px 10px; font-size: 12px; flex-shrink: 0 }
+.browser-mkdir button:disabled { opacity: .45; cursor: not-allowed; }
+
 /* ============================================================
    底部 navbar — 进度 + 主操作
    ============================================================ */

@@ -124,6 +124,11 @@ const STRINGS = {
     'btn.go':            { zh: '前往',                en: 'Go' },
     'btn.cancel':        { zh: '取消',                en: 'Cancel' },
     'btn.pick_this':     { zh: '选择此文件夹',        en: 'Pick this folder' },
+    'btn.use_tag_name':  { zh: '标签名',              en: 'Tag name' },
+    'btn.mkdir':         { zh: '新建',                en: 'Create' },
+    'ph.mkdir_name':     { zh: '新建文件夹名',        en: 'New folder name' },
+    'msg.mkdir_need_name': { zh: '请先输入文件夹名',
+                             en: 'Please enter a folder name first.' },
     'btn.ok':            { zh: '确定',                en: 'OK' },
     'tab.grid':          { zh: '图片网格',            en: 'Grid' },
     'tab.cat':           { zh: '标签分类',            en: 'Categories' },
@@ -1219,6 +1224,9 @@ async function transferSelected(mode) {
     if (!catSelect.size) return;
     const paths = [...catSelect].filter(p => p);
     openBrowser({
+        // 分类详情下，state.categoryName 就是英文 tag 名——点击「标签名」按钮
+        // 会把它填进「新建文件夹」的输入框。
+        suggestedName: state.categoryName || '',
         onPick: async (dest) => {
             const r = await fetch('/api/files/transfer', {
                 method: 'POST',
@@ -1490,6 +1498,7 @@ const browser = {
     current: '', parent: null,
     targetId: null,       // 直接写入某个输入框
     onPick: null,         // 或者回调 (path) => void
+    suggestedName: '',    // 「用标签名」按钮用到的名字（分类详情触发时传入）
 };
 
 function openBrowser(opts = {}) {
@@ -1497,10 +1506,16 @@ function openBrowser(opts = {}) {
     if (typeof opts === 'string') opts = { targetId: opts };
     browser.targetId = opts.targetId || null;
     browser.onPick = opts.onPick || null;
+    browser.suggestedName = opts.suggestedName || '';
     const seedId = browser.targetId || 'folder-path';
     const seedEl = $(seedId);
     const cur = seedEl ? seedEl.value.trim() : '';
     $('browser-modal').hidden = false;
+    // 重置 mkdir 输入 & 「用标签名」按钮可用性
+    const nameInput = $('mkdir-name');
+    if (nameInput) nameInput.value = '';
+    const useTagBtn = $('mkdir-use-tag');
+    if (useTagBtn) useTagBtn.disabled = !browser.suggestedName;
     browserLoad(cur || '');
 }
 
@@ -1535,6 +1550,43 @@ function initFolderBrowser() {
     $('browser-modal').addEventListener('click', (e) => {
         if (e.target.id === 'browser-modal') closeBrowser();
     });
+
+    // ---- 新建文件夹 ----
+    const nameInput = $('mkdir-name');
+    const useTagBtn = $('mkdir-use-tag');
+    const createBtn = $('mkdir-create');
+
+    if (useTagBtn) {
+        useTagBtn.addEventListener('click', () => {
+            if (!browser.suggestedName) return;
+            nameInput.value = browser.suggestedName;
+            nameInput.focus();
+        });
+    }
+    if (nameInput) {
+        nameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); runMkdir(); }
+        });
+    }
+    if (createBtn) {
+        createBtn.addEventListener('click', runMkdir);
+    }
+
+    async function runMkdir() {
+        const name = (nameInput?.value || '').trim();
+        if (!name) { await showAlert(t('msg.mkdir_need_name')); return; }
+        if (!browser.current) { await showAlert(t('msg.pick_folder')); return; }
+        const r = await fetch('/api/mkdir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parent: browser.current, name }),
+        });
+        const d = await r.json();
+        if (d.error) { await showAlert(d.error); return; }
+        nameInput.value = '';
+        // 新建成功 → 刷新当前目录并跳进去
+        await browserLoad(d.path || browser.current);
+    }
 }
 
 async function browserLoad(path) {

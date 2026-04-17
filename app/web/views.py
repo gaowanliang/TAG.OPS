@@ -476,6 +476,28 @@ def _browser_modal():
             ),
             Div(id="browser-list", cls="browser-list"),
             Div(
+                Input(
+                    id="mkdir-name", type="text",
+                    placeholder="新建文件夹名",
+                    autocomplete="off",
+                    **{"data-i18n-ph": "ph.mkdir_name"},
+                ),
+                Button(
+                    Span(cls="fa-solid fa-tag"),
+                    Span("标签名", **{"data-i18n": "btn.use_tag_name"}),
+                    id="mkdir-use-tag", type="button",
+                    cls="secondary btn-with-icon",
+                    title="用当前分类标签名填入",
+                ),
+                Button(
+                    Span(cls="fa-solid fa-folder-plus"),
+                    Span("新建", **{"data-i18n": "btn.mkdir"}),
+                    id="mkdir-create", type="button",
+                    cls="btn-with-icon",
+                ),
+                cls="browser-mkdir",
+            ),
+            Div(
                 Button("取消", id="browser-cancel", type="button", cls="secondary",
                        **{"data-i18n": "btn.cancel"}),
                 Button("选择此文件夹", id="browser-pick", type="button",

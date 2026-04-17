@@ -1,10 +1,10 @@
 [English](README.md) | [中文](README_zh.md)
 
+# TAG.OPS
+
 <p align="center">
   <img src="img/icon.png" alt="TAG.OPS icon" width="120" />
 </p>
-
-# TAG.OPS
 
 A local-first anime image auto-tagging workbench. Easily drop a folder or images to generate tags using WD14 and Camie-tagger-v2 models, organize them, and save the results.
 
@@ -40,8 +40,9 @@ pip install -r requirements.txt
 ```bash
 python main.py
 ```
-Your browser will automatically open `http://127.0.0.1:8765`. 
-*Models will be downloaded automatically to the `models/` directory on the first run.*
+
+Your browser will automatically open `http://127.0.0.1:8765`.
+_Models will be downloaded automatically to the `models/` directory on the first run._
 
 ## Project Structure
 

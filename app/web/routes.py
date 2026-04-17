@@ -417,6 +417,48 @@ def register(app, rt):
         ok = _db.delete_run(int(body.get("id")))
         return JSONResponse({"deleted": ok})
 
+    # ---- mkdir (for the folder browser) ----
+    @app.post("/api/mkdir")
+    async def _mkdir(request: Request):
+        import re as _re
+        try:
+            body = await request.json()
+            parent_raw = (body.get("parent") or "").strip()
+            name_raw = (body.get("name") or "").strip()
+            if not parent_raw or not name_raw:
+                return JSONResponse(
+                    {"error": "parent / name 均为必填"}, status_code=400
+                )
+            parent = Path(parent_raw).expanduser().resolve()
+            if not parent.is_dir():
+                return JSONResponse(
+                    {"error": f"上级目录不存在: {parent}"}, status_code=400
+                )
+            # 清洗非法字符（Windows 不允许 \ / : * ? " < > |，其它系统也顺手清掉）
+            sanitized = _re.sub(r'[\\/:*?"<>|\r\n\t]+', "_", name_raw).strip(" .")
+            if not sanitized:
+                return JSONResponse(
+                    {"error": "文件夹名清洗后为空"}, status_code=400
+                )
+            if len(sanitized) > 200:
+                sanitized = sanitized[:200]
+            target = parent / sanitized
+            if target.exists():
+                return JSONResponse({
+                    "path": str(target),
+                    "created": False,
+                    "message": "目录已存在",
+                })
+            target.mkdir(parents=False, exist_ok=False)
+            return JSONResponse({
+                "path": str(target),
+                "created": True,
+            })
+        except Exception as e:
+            return JSONResponse(
+                {"error": f"{e}\n{traceback.format_exc()}"}, status_code=500
+            )
+
     # ---- file transfer (copy/move selected files to a destination) ----
     @app.post("/api/files/transfer")
     async def _files_transfer(request: Request):
