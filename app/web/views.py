@@ -432,7 +432,26 @@ def _topbar():
             cls="topbar-tabs",
         ),
         # 右：滑动式语言切换（类似老式滑盖手机，中/EN 上下排列）
+        # 右：主题 + 语言切换（滑盖式，图标/字上下排列）
         Div(
+            Div(
+                Span(
+                    Span(cls="fa-solid fa-sun"),
+                    cls="theme-slot theme-light active",
+                    **{"data-theme-value": "light"},
+                ),
+                Span(
+                    Span(cls="fa-solid fa-moon"),
+                    cls="theme-slot theme-dark",
+                    **{"data-theme-value": "dark"},
+                ),
+                Span(cls="theme-thumb"),
+                id="btn-theme",
+                cls="theme-slider",
+                title="Theme / 主题",
+                role="button",
+                tabindex="0",
+            ),
             Div(
                 Span("中", cls="lang-slot lang-zh active", **{"data-lang": "zh"}),
                 Span("EN", cls="lang-slot lang-en", **{"data-lang": "en"}),

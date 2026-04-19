@@ -49,6 +49,7 @@ const state = {
     categoryName: null,
     currentDetail: null,
     lang: 'zh',
+    theme: 'light',
 };
 
 // ---- tag translations (from /api/tag-i18n) ----
@@ -278,6 +279,26 @@ function setLang(lang) {
         if (r) renderDetail(r);
     }
     if (state.view === 'category') renderCategoryGrid();
+}
+
+// ---- theme (light / dark) ----
+function applyTheme() {
+    document.documentElement.setAttribute('data-theme', state.theme);
+    const slider = $('btn-theme');
+    if (slider) {
+        slider.classList.toggle('theme-light', state.theme === 'light');
+        slider.classList.toggle('theme-dark', state.theme === 'dark');
+        slider.querySelectorAll('.theme-slot').forEach(el => {
+            el.classList.toggle('active',
+                el.getAttribute('data-theme-value') === state.theme);
+        });
+    }
+}
+
+function setTheme(theme) {
+    state.theme = theme;
+    localStorage.setItem('aict_theme', theme);
+    applyTheme();
 }
 
 // ---- upload staging (drag & drop) ----
@@ -1272,6 +1293,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     applyI18n();
 
+    // 恢复主题（无保存时跟随系统 prefers-color-scheme）
+    const savedTheme = localStorage.getItem('aict_theme');
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+        state.theme = savedTheme;
+    } else {
+        const prefersDark = window.matchMedia
+            && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        state.theme = prefersDark ? 'dark' : 'light';
+    }
+    applyTheme();
+
     await loadTagI18n();
     loadHardware();
     loadModels();
@@ -1311,6 +1343,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             setLang(state.lang === 'zh' ? 'en' : 'zh');
+        }
+    });
+
+    $('btn-theme').addEventListener('click', () => {
+        setTheme(state.theme === 'light' ? 'dark' : 'light');
+    });
+    $('btn-theme').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setTheme(state.theme === 'light' ? 'dark' : 'light');
         }
     });
 

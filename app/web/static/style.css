@@ -275,6 +275,7 @@ body {
     z-index: 5;
     display: flex;
     align-items: center;
+    gap: 8px;
     justify-self: end;
 }
 .lang-slider {
@@ -330,6 +331,60 @@ body {
 }
 .lang-slider.lang-en .lang-thumb {
     transform: translateY(100%);
+}
+
+/* ---------- 主题切换（同形滑盖，太阳 / 月亮图标） ---------- */
+.theme-slider {
+    position: relative;
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    width: 34px;
+    height: 40px;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-radius: 8px;
+    box-shadow: 2px 2px 0 0 var(--ink);
+    cursor: pointer;
+    overflow: hidden;
+    user-select: none;
+    transition: transform .1s;
+}
+.theme-slider:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 0 var(--ink);
+}
+.theme-slider:focus-visible {
+    outline: 2px solid var(--magenta);
+    outline-offset: 2px;
+}
+.theme-slot {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--mut);
+    transition: color .2s;
+}
+.theme-slot.active { color: var(--paper); }
+.theme-thumb {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    top: 2px;
+    height: calc(50% - 2px);
+    background: var(--violet);
+    border: 1.5px solid var(--ink);
+    border-radius: 5px;
+    box-shadow: 1px 1px 0 0 var(--ink);
+    transition: transform .2s cubic-bezier(.5, 1.5, .5, 1), background .3s;
+    z-index: 1;
+    pointer-events: none;
+}
+.theme-slider.theme-dark .theme-thumb {
+    transform: translateY(100%);
+    background: var(--magenta);
 }
 
 /* ============================================================
@@ -1849,4 +1904,229 @@ progress::-moz-progress-bar { background: var(--violet) }
     padding: 10px 14px;
     border-top: 2px solid var(--ink);
     background: var(--muted-bg);
+}
+
+/* ============================================================
+   Dark mode —— 合成波街机 · 新孟菲斯 · 游戏化
+   触发：<html data-theme="dark">
+   设计思路：
+   • 统一的冷色靛蓝家族 —— 底色、卡片、hover、面板都是蓝紫亲族，
+     避免奶油/紫色错位带来的脏感
+   • "ink" 用干净的冷白 (#f5f6ff) —— 3px 边框 / 6px 阴影像霓虹灯管
+   • 强调色往上抽饱和度：电光青柠 / 冰蓝 / 热粉 / 紫罗兰
+   • 顶栏：深靛斜条 + 霓虹聚光 + 标题淡粉光晕，像街机 marquee
+   ============================================================ */
+[data-theme="dark"] {
+    color-scheme: dark;
+
+    --bg:        #0b0b20;                 /* 深空靛黑 —— 干净冷调 */
+    --dot:       rgba(160, 140, 255, 0.30);  /* 点阵：冰紫（与底同系） */
+
+    --ink:       #f5f6ff;                 /* 冷白 —— 边框/阴影/主文字 */
+    --paper:     #16172f;                 /* 卡片：深海蓝紫 */
+    --mut:       #9695c6;                 /* 次级文字：冷色薰衣草 */
+    --muted-bg:  #1d1e3c;                 /* 次级面板 */
+
+    --lime:      #b8ff2e;                 /* 电光青柠 */
+    --cyan:      #45d6e8;                 /* 冰蓝 */
+    --magenta:   #ff3f9d;                 /* 热粉霓虹 */
+    --violet:    #8e73ff;
+    --violet-2:  #a892ff;
+    --orange:    #ff9a3c;
+    --yellow:    #ffd04a;
+    --red:       #ff5568;
+    --ok:        #3fd977;
+}
+
+/* ---------- 顶栏：深靛斜条 + 霓虹聚光 ---------- */
+[data-theme="dark"] .app-topbar {
+    background:
+        radial-gradient(circle at 18% 140%, var(--cyan) 0 90px, transparent 92px),
+        radial-gradient(circle at 82% -40%, var(--magenta) 0 100px, transparent 102px),
+        repeating-linear-gradient(-45deg,
+            #1a1a44 0 18px,
+            #0f0f2a 18px 36px);
+}
+[data-theme="dark"] .app-topbar::after { opacity: .14 }
+
+/* marquee：品牌标题带一点粉色光晕；.OPS 的描边改粉保证在深底仍清晰 */
+[data-theme="dark"] .app-topbar h1 {
+    text-shadow: 0 0 12px rgba(255, 63, 157, 0.45);
+}
+[data-theme="dark"] .brand-accent {
+    -webkit-text-stroke: 1px var(--magenta);
+}
+/* 斜放的紫色 tile：阴影改 magenta，更合成波 */
+[data-theme="dark"] .topbar-tile {
+    box-shadow: 3px 3px 0 0 var(--magenta);
+}
+
+/* ---------- 亮色强调底 (lime / cyan / yellow) 上的文字需要深色 ---------- */
+[data-theme="dark"] button,
+[data-theme="dark"] button.secondary,
+[data-theme="dark"] button[type=submit],
+[data-theme="dark"] .topbar-tabs .tab.active,
+[data-theme="dark"] .tabs .tab.active,
+[data-theme="dark"] .cat-stat:nth-child(2),
+[data-theme="dark"] .cat-stat:nth-child(2) h2,
+[data-theme="dark"] .cat-stat:nth-child(3),
+[data-theme="dark"] .cat-stat:nth-child(3) h2,
+[data-theme="dark"] .hw-gpu-item.selected,
+[data-theme="dark"] .hw-gpu-item.selected .hw-gpu-name,
+[data-theme="dark"] .card-status.ok,
+[data-theme="dark"] .history-row .hrow-rec.on,
+[data-theme="dark"] .history-row .hrow-count,
+[data-theme="dark"] .history-hint,
+[data-theme="dark"] .model-tier,
+[data-theme="dark"] .model-tier.tier-a,
+[data-theme="dark"] .model-tier.tier-b,
+[data-theme="dark"] .model-hint-dl.ok,
+[data-theme="dark"] .model-hint-dl.warn,
+[data-theme="dark"] .browser-header,
+[data-theme="dark"] .browser-header h3,
+[data-theme="dark"] .dialog-header,
+[data-theme="dark"] .dialog-header h3,
+[data-theme="dark"] .hw-stat-badge.accel,
+[data-theme="dark"] .hw-stat-badge.net,
+[data-theme="dark"] .hw-stat-badge.prov,
+[data-theme="dark"] .about-card .about-row:nth-child(3) .about-ico,
+[data-theme="dark"] input[type=file],
+[data-theme="dark"] .dropzone.is-drag {
+    color: #0a0a1a;
+}
+
+/* 禁用按钮：暗靛底 + 薰衣草字 */
+[data-theme="dark"] button:disabled {
+    background: #27284d;
+    color: var(--mut);
+}
+
+/* ---------- magenta / violet / red 底上文字 → 冷白 ---------- */
+[data-theme="dark"] .topbar-tile,
+[data-theme="dark"] .dropzone-icon,
+[data-theme="dark"] .drop-overlay-icon,
+[data-theme="dark"] .about-card .about-ico,
+[data-theme="dark"] .hw-stat-badge.gpu,
+[data-theme="dark"] .hw-stat-badge.warn,
+[data-theme="dark"] .rating-chip.top,
+[data-theme="dark"] .rating-chip.top .rc-name,
+[data-theme="dark"] .rating-chip.top .rc-val,
+[data-theme="dark"] .hw-gpu-item.selected .hw-gpu-index,
+[data-theme="dark"] .history-row .hrow-id,
+[data-theme="dark"] .history-row .hrow-del:hover,
+[data-theme="dark"] .card-status.err,
+[data-theme="dark"] .card-check.on,
+[data-theme="dark"] .err,
+[data-theme="dark"] .cat-stat,
+[data-theme="dark"] .cat-stat h2,
+[data-theme="dark"] .model-tier.tier-s,
+[data-theme="dark"] .pager-btn.active {
+    color: #ffffff;
+}
+
+/* ---------- LED 风格小标签：ink 底 + lime 字
+     在暗色下 ink=冷白，会吃掉 lime；改用深靛底，保留 lime 电光字 ---------- */
+[data-theme="dark"] .brand-kw,
+[data-theme="dark"] .hist-hint-icon,
+[data-theme="dark"] #pmsg,
+[data-theme="dark"] .tag-count-badge,
+[data-theme="dark"] input[type=file]::file-selector-button {
+    background: #08091c;
+    border-color: #08091c;
+}
+[data-theme="dark"] .tag-count-badge { color: var(--lime) !important; }
+
+/* 底部进度条里 #pmsg 被重写为透明底，保留 */
+[data-theme="dark"] .bottom-progress #pmsg {
+    background: transparent;
+    border-color: transparent;
+}
+/* bottom-label：冷白底 + 深底字（老 CRT 标签感） */
+[data-theme="dark"] .bottom-label {
+    color: #0a0a1a;
+    background: var(--ink);
+}
+
+/* ---------- hover / focus 的浅色高光 → 统一的靛蓝调 ---------- */
+[data-theme="dark"] .topbar-tabs .tab:hover { background: #24264f; }
+[data-theme="dark"] .about-card .about-row:hover,
+[data-theme="dark"] .history-row:hover {
+    background: #1f2044;
+}
+[data-theme="dark"] input[type=text]:hover,
+[data-theme="dark"] input[type=number]:hover,
+[data-theme="dark"] select:hover {
+    background: #1c1d3c;
+}
+[data-theme="dark"] input[type=text]:focus,
+[data-theme="dark"] input[type=number]:focus,
+[data-theme="dark"] select:focus {
+    background: #262752;
+    box-shadow: 4px 4px 0 0 var(--magenta), 4px 4px 0 2.5px var(--ink);
+}
+[data-theme="dark"] .dropzone:hover { background-color: #1d1e40; }
+[data-theme="dark"] .tabs .tab:hover { background: #1f2046; }
+[data-theme="dark"] .bar-row:hover { background: #1c1d3c; }
+
+/* hw-stat.warn（原来浅粉底）→ 暗红靛 */
+[data-theme="dark"] .hw-stat.warn { background: #3a1832; }
+
+/* ---------- placeholder / 次级灰字 ---------- */
+[data-theme="dark"] input::placeholder { color: #5e5d8e; }
+[data-theme="dark"] .bar-label-en,
+[data-theme="dark"] .rating-chip .rc-en { color: #716f9e; }
+[data-theme="dark"] .rating-chip.top .rc-en { color: rgba(255, 255, 255, 0.72); }
+
+/* ---------- 进度条 / bar-fill 第二条纹色 ---------- */
+[data-theme="dark"] progress::-webkit-progress-value {
+    background: repeating-linear-gradient(
+        45deg, var(--violet), var(--violet) 10px,
+        #5c4fdb 10px, #5c4fdb 20px);
+}
+[data-theme="dark"] .bar-fill {
+    background: repeating-linear-gradient(
+        45deg, var(--violet), var(--violet) 8px,
+        #5c4fdb 8px, #5c4fdb 16px);
+}
+
+/* ---------- 轨道 / 缩略图占位（统一靛蓝家族） ---------- */
+[data-theme="dark"] .bar-track { background: #22234a; }
+[data-theme="dark"] .card-img .thumb { background: #1c1d3e; }
+[data-theme="dark"] .thumb-placeholder {
+    background: repeating-linear-gradient(45deg,
+        #1d1e40, #1d1e40 10px, #14152e 10px, #14152e 20px);
+    color: var(--mut);
+}
+
+/* ---------- 虚线 / overlay / scrollbar ---------- */
+[data-theme="dark"] .kv { border-bottom-color: #2a2b54; }
+[data-theme="dark"] .drop-overlay { background: rgba(11, 11, 32, 0.92); }
+[data-theme="dark"] .sidebar-scroll::-webkit-scrollbar-thumb {
+    background: var(--ink);
+    border-color: var(--paper);
+}
+[data-theme="dark"] .main-scroll::-webkit-scrollbar-thumb {
+    background: var(--ink);
+    border-color: var(--bg);
+}
+
+/* ---------- 滑块自身：dark 下 thumb 移到粉色，active slot 字用冷白 ---------- */
+[data-theme="dark"] .theme-slot.active,
+[data-theme="dark"] .lang-slot.active { color: #ffffff; }
+
+/* ---------- 游戏化：主操作按钮双层霓虹阴影 ---------- */
+[data-theme="dark"] #btn-run {
+    box-shadow:
+        3px 3px 0 0 var(--ink),
+        3px 3px 0 3px var(--magenta);
+}
+[data-theme="dark"] #btn-run:hover {
+    box-shadow:
+        4px 4px 0 0 var(--ink),
+        4px 4px 0 3px var(--magenta);
+}
+[data-theme="dark"] #btn-run:active {
+    box-shadow:
+        1px 1px 0 0 var(--ink),
+        1px 1px 0 2px var(--magenta);
 }
