@@ -42,7 +42,8 @@ Thumbs.db
 desktop.ini
 $RECYCLE.BIN/
 
-models/
+/models/
+/logs/
 
 data/history.db
 data/*.sqlite
