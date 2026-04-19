@@ -341,10 +341,12 @@ function renderHardware(d) {
     const channel = (state.lang === 'en' && d.download_channel_en)
         ? d.download_channel_en
         : d.download_channel;
+    // 通道副标题用 channel_endpoint，避免魔搭下显示 hf-mirror
+    const channelEndpoint = d.channel_endpoint || net.endpoint || '—';
     box.append(stat({
         label: 'CHANNEL',
         value: channel || '—',
-        sub: `${net.region || '—'} · ${net.endpoint || '—'}`,
+        sub: `${net.region || '—'} · ${channelEndpoint}`,
         badge: '◎',
         badgeCls: 'net',
     }));

@@ -7,6 +7,7 @@ Anime Image Classification Evaluation Tool — 启动入口。
 """
 from __future__ import annotations
 
+import logging
 import sys
 import threading
 import webbrowser
@@ -15,8 +16,12 @@ import uvicorn
 
 from app import HOST, PORT, URL
 from app.hardware import detect_hardware
+from app.logging_setup import get_log_path, setup_logging
 from app.web import create_app
 
+
+# 必须在 import/创建 app 之前配置好日志，才能接到 onnxruntime / uvicorn 的输出
+setup_logging()
 
 app, _ = create_app()
 
@@ -27,12 +32,18 @@ def _open_browser_later(delay: float = 1.2) -> None:
 
 def _print_banner() -> None:
     hw = detect_hardware()
-    print("=" * 60)
-    print(f" Anime Image Classifier  ·  {URL}")
-    print(f" ONNX providers: {hw.get('providers')}")
-    print(f" Selected: {hw.get('selected')}  ({hw.get('accelerator')})")
-    print(f" GPUs: {hw.get('gpus')}")
-    print("=" * 60)
+    log = logging.getLogger("main")
+    bar = "=" * 60
+    for line in (
+        bar,
+        f" Anime Image Classifier  ·  {URL}",
+        f" Log file: {get_log_path()}",
+        f" ONNX providers: {hw.get('providers')}",
+        f" Selected: {hw.get('selected')}  ({hw.get('accelerator')})",
+        f" GPUs: {hw.get('gpus')}",
+        bar,
+    ):
+        log.info(line)
 
 
 def main() -> None:
