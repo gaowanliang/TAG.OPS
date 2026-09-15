@@ -1,8 +1,8 @@
 """集中式日志配置：控制台 + logs/YYYYMMDD-HHMMSS.log。
 
 - Python 侧：root logger 同时写到原 stderr 与文件。
-- 原生侧（ONNX Runtime 的 C++ 日志、print、traceback）通过 Tee 劫持
-  sys.stdout / sys.stderr，一并落盘。
+- Python print / traceback 通过 Tee 劫持 sys.stdout / sys.stderr，一并落盘。
+- ORT 原生日志不经过 Python 流；算子执行证据另存 logs/ort-profiles。
 - ONNX Runtime 默认日志等级调到 INFO，便于排查 DML/CUDA 回落 CPU 的原因。
 """
 from __future__ import annotations
@@ -28,8 +28,8 @@ _STATE: dict = {
 class _Tee:
     """把 write 同时发到原流 (stdout/stderr) 与日志文件。
 
-    用来捕获 ONNX Runtime C++ 端写到 stderr 的日志、第三方库的 print 等
-    无法通过 Python logging 截获的输出。
+    捕获第三方库的 Python print 等输出。原生代码直接写文件描述符的
+    日志不经过此对象，不能声称已被 Tee 捕获。
     """
 
     def __init__(self, original: Optional[IO], file: IO) -> None:
@@ -90,7 +90,7 @@ def setup_logging(level: int = logging.INFO) -> Path:
     log_path = LOG_DIR / f"{stamp}-{pid}.log"
     fh = open(log_path, "a", encoding="utf-8", buffering=1)
 
-    # 1) Tee stdout/stderr —— 捕获 ORT / 第三方 print
+    # 1) Tee stdout/stderr —— 捕获 Python print / traceback
     if sys.stdout is not None:
         sys.stdout = _Tee(sys.stdout, fh)  # type: ignore[assignment]
     if sys.stderr is not None:

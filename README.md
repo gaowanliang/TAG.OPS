@@ -29,16 +29,16 @@ Runs entirely local using ONNX Runtime. Supports DirectML, CUDA, and CPU fall-ba
 
 ## Installation & Usage
 
-1. **Install uv and Sync the CUDA Environment**
+1. **Install uv and Sync the DirectML Environment**
 
 ```bash
 pip install uv
 uv sync --extra directml
 ```
 
-The CUDA environment uses the PyTorch CUDA 13.0 (`cu130`) wheels. For a
-different ONNX Runtime backend, use `uv sync --extra directml` on Windows or
-`uv sync --extra cpu`. These runtime extras are mutually exclusive.
+Windows releases use DirectML by default. Use `uv sync --extra cpu` for CPU
+only, or `uv sync --extra cuda` for a separate NVIDIA CUDA environment.
+These runtime extras are mutually exclusive.
 
 2. **Start the Application**
 
@@ -51,18 +51,19 @@ _Models will be downloaded automatically to the `models/` directory on the first
 
 ## Build the Windows Executable
 
-PyInstaller is isolated in uv's `build` dependency group. Build the CUDA
-distribution with:
+PyInstaller is isolated in uv's `build` dependency group. Build the DirectML
+release with:
 
 ```powershell
 .\scripts\build.ps1
 ```
 
-Use `directml` or `cpu` instead when building those runtime variants. The
-result is `dist\TagOps\TagOps.exe`. Distribute the entire `dist\TagOps`
-directory: `_internal` contains the Python, ONNX Runtime, and CUDA libraries
-required by the executable. Models, logs, and the writable history database
-remain next to the executable and are created at runtime.
+The script builds `dist\TagOps\TagOps.exe` and creates
+`dist\TagOps-1.1-DirectML-win64.zip`, including editable `data/tags_tr.yaml`
+translations and release notes. Distribute the complete ZIP; `_internal`
+contains the runtime libraries. Models, logs, and history remain next to the
+executable. Other runtime builds require an explicit `-Backend cuda` or
+`-Backend cpu` option.
 
 ## Project Structure
 
@@ -73,7 +74,8 @@ remain next to the executable and are created at runtime.
 ├── TagOps.spec             # PyInstaller build definition
 ├── scripts/build.ps1       # Reproducible backend-aware build command
 ├── data/
-│   ├── stg.csv             # Tag to Chinese translation table
+│   ├── tags_tr.yaml        # Editable tag translations
+│   ├── stg.csv             # Legacy translation fallback
 │   └── history.db          # Generated SQLite history tracking
 ├── models/                 # Auto-created directory for model weights
 └── app/                    # Core application logic

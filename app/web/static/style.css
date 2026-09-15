@@ -180,6 +180,14 @@ body {
     transform: rotate(-4deg);
 }
 .topbar-text { display: flex; flex-direction: column; gap: 2px; }
+
+.brand-version {
+    color: var(--muted, #7b8190);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    line-height: 1;
+}
 .app-topbar h1 {
     margin: 0;
     font-style: italic;

@@ -1,0 +1,88 @@
+{
+  "source": "GTX 1660 SUPER tester report, 2026-09-15; GPU counters only",
+  "device": {
+    "id": 0,
+    "name": "NVIDIA GeForce GTX 1660 SUPER",
+    "software": false,
+    "memory_bytes": 6255804416,
+    "luid": "00000000:0000f73d"
+  },
+  "samples": [
+    {
+      "phase": "load",
+      "before": {
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_14_engtype_copy": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_13_engtype_vr": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_12_engtype_compute_1": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_11_engtype_cuda": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_10_engtype_graphics_1": 778085,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_9_engtype_videoencode": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_8_engtype_videoencode": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_7_engtype_security": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_6_engtype_copy": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_5_engtype_copy": 59755,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_4_engtype_copy": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_3_engtype_videodecode": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_2_engtype_legacyoverlay": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_1_engtype_compute_0": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_0_engtype_3d": 0
+      },
+      "after": {
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_14_engtype_copy": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_13_engtype_vr": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_12_engtype_compute_1": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_11_engtype_cuda": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_10_engtype_graphics_1": 2619389,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_9_engtype_videoencode": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_8_engtype_videoencode": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_7_engtype_security": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_6_engtype_copy": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_5_engtype_copy": 74769,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_4_engtype_copy": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_3_engtype_videodecode": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_2_engtype_legacyoverlay": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_1_engtype_compute_0": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_0_engtype_3d": 0
+      },
+      "expected_ticks": 1841304
+    },
+    {
+      "phase": "image",
+      "before": {
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_14_engtype_copy": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_13_engtype_vr": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_12_engtype_compute_1": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_11_engtype_cuda": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_10_engtype_graphics_1": 2619389,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_9_engtype_videoencode": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_8_engtype_videoencode": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_7_engtype_security": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_6_engtype_copy": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_5_engtype_copy": 74769,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_4_engtype_copy": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_3_engtype_videodecode": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_2_engtype_legacyoverlay": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_1_engtype_compute_0": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_0_engtype_3d": 0
+      },
+      "after": {
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_14_engtype_copy": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_13_engtype_vr": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_12_engtype_compute_1": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_11_engtype_cuda": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_10_engtype_graphics_1": 4069792,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_9_engtype_videoencode": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_8_engtype_videoencode": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_7_engtype_security": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_6_engtype_copy": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_5_engtype_copy": 74769,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_4_engtype_copy": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_3_engtype_videodecode": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_2_engtype_legacyoverlay": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_1_engtype_compute_0": 0,
+        "pid_18176_luid_0x00000000_0x0000f73d_phys_0_eng_0_engtype_3d": 0
+      },
+      "expected_ticks": 1450403
+    }
+  ]
+}

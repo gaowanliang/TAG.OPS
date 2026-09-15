@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import numpy as np
 
@@ -41,6 +41,40 @@ class PreflightTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "wrong device"):
             _preflight_model(model)
         model.session.run.assert_not_called()
+
+    def test_cpu_only_model_is_rejected_even_with_dml_registered(self):
+        model = self.model()
+        model.profile_enabled = True
+        model.session.get_providers.return_value = ["DmlExecutionProvider", "CPUExecutionProvider"]
+        model.session.get_provider_options.return_value = {}
+        model.device_check = session_check(model.session, "DmlExecutionProvider", None)
+        with patch("app.models.loader.observe_inference", side_effect=lambda check, run: run()), \
+                patch("app.models.loader.finish_profile", return_value={"status": "cpu_only"}) as finish:
+            with self.assertRaisesRegex(RuntimeError, "模型计算全部落在 CPU"):
+                _preflight_model(model)
+        finish.assert_called_once()
+        self.assertFalse(model.profile_enabled)
+        self.assertEqual(model.device_check["reason"], "cpu_only_execution")
+        model.session.run.assert_called_once()
+
+    def test_inference_failure_still_saves_and_stops_profile(self):
+        model = self.model()
+        model.profile_enabled = True
+        model.session.run.side_effect = RuntimeError("driver failure")
+        with patch("app.models.loader.finish_profile", return_value={"status": "unverified"}) as finish:
+            with self.assertRaisesRegex(RuntimeError, "driver failure"):
+                _preflight_model(model)
+        finish.assert_called_once()
+        self.assertFalse(model.profile_enabled)
+
+    def test_profile_does_not_replace_unverified_physical_device_with_success(self):
+        model = self.model()
+        model.profile_enabled = True
+        model.device_check.update(status="unverified", message="no GPU counters")
+        with patch("app.models.loader.finish_profile", return_value={"status": "provider_observed"}):
+            _preflight_model(model)
+        self.assertEqual(model.device_check["preflight"]["status"], "unverified")
+        self.assertEqual(model.device_check["preflight"]["execution_check"]["status"], "provider_observed")
 
 
 if __name__ == "__main__":

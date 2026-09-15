@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import logging
+import json
 import os
+import platform
 import subprocess
+from functools import lru_cache
 from typing import Dict, List
 
 from .config import PROVIDER_LABEL, PROVIDER_PRIORITY
@@ -102,6 +105,29 @@ def list_windows_gpus() -> List[str]:
     if virtual:
         log.info("Ignoring virtual/remote display adapters: %s", virtual)
     return real
+
+
+@lru_cache(maxsize=1)
+def log_gpu_environment() -> None:
+    """Record driver/build information once; this WMI list is never used as DML IDs."""
+    log.info("GPU environment: os=%s python=%s", platform.platform(), platform.python_version())
+    if os.name != "nt":
+        return
+    try:
+        script = (
+            "$ErrorActionPreference='Stop'; "
+            "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new(); "
+            "Get-CimInstance Win32_VideoController | "
+            "Select-Object Name,DriverVersion,Status,ConfigManagerErrorCode | ConvertTo-Json -Compress"
+        )
+        raw = subprocess.check_output(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+            timeout=8, stderr=subprocess.PIPE, creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        log.info("Windows GPU drivers (informational, not device IDs): %s",
+                 json.loads(raw.decode("utf-8-sig")) if raw.strip() else [])
+    except Exception:
+        log.warning("Cannot read Windows GPU driver diagnostics", exc_info=True)
 
 
 def select_provider(available: List[str]) -> str:

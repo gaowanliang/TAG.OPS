@@ -18,6 +18,7 @@ from app import HOST, PORT, URL
 from app.hardware import detect_hardware
 from app.logging_setup import get_log_path, setup_logging
 from app.web import create_app
+from app.version import APP_VERSION
 
 
 # 必须在 import/创建 app 之前配置好日志，才能接到 onnxruntime / uvicorn 的输出
@@ -36,7 +37,7 @@ def _print_banner() -> None:
     bar = "=" * 60
     for line in (
         bar,
-        f" Anime Image Classifier  ·  {URL}",
+        f" TAG.OPS v{APP_VERSION}  ·  {URL}",
         f" Log file: {get_log_path()}",
         f" ONNX providers: {hw.get('providers')}",
         f" Selected: {hw.get('selected')}  ({hw.get('accelerator')})",

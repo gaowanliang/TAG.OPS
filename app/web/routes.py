@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import traceback
 import logging
+import uuid
 from dataclasses import asdict
 from pathlib import Path
 from typing import List, Tuple
@@ -20,6 +21,8 @@ from ..jobs import BatchOptions, FolderBatchOptions
 from ..models import MODEL_REGISTRY, list_models, models_info, current_model
 from .. import tag_i18n
 from .views import home_page
+
+log = logging.getLogger(__name__)
 
 
 # ------------------------------------------------------------------ helpers
@@ -63,30 +66,45 @@ def register(app, rt):
 
     @app.post("/api/dialog")
     async def _native_dialog(request: Request):
+        request_id = request.headers.get("x-dialog-request-id") or uuid.uuid4().hex
+        client = request.client.host if request.client else "unknown"
+        log.info("Dialog HTTP start id=%s client=%s origin=%r", request_id, client,
+                 request.headers.get("origin"))
         # Desktop dialogs may only be opened by this local application's page.
         origin = request.headers.get("origin")
         if (request.url.hostname not in ("127.0.0.1", "localhost", "::1")
                 or (origin and urlsplit(origin).netloc != request.url.netloc)
                 or request.headers.get("content-type", "").split(";")[0] != "application/json"):
-            return JSONResponse({"error": "仅允许本地应用打开系统对话框"}, status_code=403)
+            log.warning("Dialog HTTP rejected id=%s: non-local origin/host", request_id)
+            return JSONResponse({"error": "仅允许本地应用打开系统对话框", "request_id": request_id}, status_code=403)
         from ..dialogs import show_native_dialog
         try:
             body = await request.json()
             if not isinstance(body, dict):
+                log.warning("Dialog HTTP invalid body id=%s: expected object", request_id)
                 raise ValueError("无效请求")
             kind = body.get("kind")
             if kind not in ("alert", "confirm", "folder"):
+                log.warning("Dialog HTTP invalid kind id=%s kind=%r", request_id, kind)
                 raise ValueError("不支持的对话框类型")
             fields = [body.get(k, "") for k in ("title", "message", "initial_path")]
             if any(not isinstance(v, str) or len(v) > 16000 for v in fields):
+                log.warning("Dialog HTTP invalid fields id=%s", request_id)
                 raise ValueError("无效的对话框内容")
+            log.info("Dialog HTTP dispatch id=%s kind=%s title=%r message_length=%d initial_path=%r",
+                     request_id, kind, fields[0], len(fields[1]), fields[2])
             result = await run_in_threadpool(show_native_dialog, kind, *fields)
+            log.info("Dialog HTTP success id=%s kind=%s result_keys=%s", request_id, kind,
+                     sorted(result.keys()))
+            result["request_id"] = request_id
             return JSONResponse(result)
         except ValueError as exc:
-            return JSONResponse({"error": str(exc)}, status_code=400)
+            log.warning("Dialog HTTP bad request id=%s error=%s", request_id, exc)
+            return JSONResponse({"error": str(exc), "request_id": request_id}, status_code=400)
         except Exception:
-            logging.getLogger(__name__).exception("Native dialog failed")
-            return JSONResponse({"error": "无法打开系统对话框，请检查后端程序是否运行在交互桌面"}, status_code=500)
+            log.exception("Dialog HTTP failed id=%s", request_id)
+            return JSONResponse({"error": "无法打开系统对话框，请检查后端程序是否运行在交互桌面",
+                                 "request_id": request_id}, status_code=500)
 
     # ---- page ----
     @rt("/")

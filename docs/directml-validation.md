@@ -42,3 +42,34 @@ tmp/dml-test-env/Scripts/python.exe scripts/validate_directml.py --model camie-t
 28 项自动化测试也已在这个 DirectML 环境下通过。脚本默认使用本地已下载的模型；模型缺失时会走应用现有下载逻辑。可通过 `--images 图片1 图片2` 换用复现样本。
 
 完整报告、原始分数和日志分别位于 `logs/directml-validation/` 与 `logs/directml-validation-camie/`。每个进程限时 300 秒；设备不一致、回退、缺少活动证据、数值异常或超时均报告失败，脚本以非零退出码结束。
+
+## GTX 1660 SUPER 测试报告后的诊断验证
+
+收到 `camie-tagger-v2` 在 GTX 1660 SUPER 上没有 GPU 活动的报告后，增加了载入推理的 ORT 算子记录、系统/驱动信息和 GPU 原始计数器日志，并延长计数器采样间隔。仅凭旧日志中的 `actual_provider=DmlExecutionProvider` 不能判断算子实际运行位置；当时尚未确认根因，后续诊断日志的结论见下文。
+
+在上述同一 DirectML 环境重新跑了两个模型的全部 8 组测试，均通过，数值差异与表中一致。新增断言要求 GPU 模式必须有 DirectML 模型算子执行记录，CPU 基准必须记录为全 CPU。Camie v2 的 GPU 模式记录到 420 个 DirectML 节点和 213 个 CPU 节点，卷积和矩阵乘法在 DirectML 执行；节点数量不代表计算量占比。GPU 模式的载入和首图 LUID 检查仍均通过。
+
+42 项 Python 自动化测试与前端检查通过。新增回归覆盖：DML 已注册但模型全在 CPU、DML 仅执行复制、缺失/不完整 profile、延迟计数器、计数器查询失败、精确 PID 过滤，以及自检失败后不重复推理。
+
+本轮报告位于 `logs/directml-report-camie/report.json` 和 `logs/directml-report-wd/report.json`；原始 profile 位于 `logs/ort-profiles/`。未在 GTX 1660 SUPER 或 Intel UHD 上实测，不能据本机结果宣称测试人员的问题已经修复。
+
+诊断包 `dist/TagOps-1.0-DirectML-diagnostics-win64.zip` 已从独立 DML 环境构建，检查无 CUDA/PyTorch DLL，ZIP 校验通过。将 ZIP 解压到中文路径后，直接运行打包的 EXE，通过 API 使用 Camie v2 识别两张不同图片：载入/首图 GPU 活动核验通过，算子 profile 和驱动/原始计数器日志均正确落盘。记录位于 `logs/frozen-gpu-diagnostics.json`。分发包不含测试日志或模型，包内附有复测说明。
+
+## Graphics_1 引擎漏报修正
+
+测试人员回传的 `20260915-160053-18176.log` 显示系统为 Windows 10 build 18363，NVIDIA 驱动版本 `32.0.15.8142`。同一进程（PID 18176）所选 GTX 1660 SUPER 的 LUID 为 `00000000:0000f73d`。载入先验执行了 420 个 DirectML 节点（包括 Conv、MatMul、Gemm）和 213 个 CPU 辅助节点；没有记录到 CPU 卷积/矩阵乘法。
+
+| 阶段 | Graphics_1 累计值（前 → 后，单位 100 ns） | 增量 | 3D / Compute 增量 |
+| --- | --- | --- | --- |
+| 载入先验 | 778085 → 2619389 | 184.1304 ms | 0 |
+| 首张图片 | 2619389 → 4069792 | 145.0403 ms | 0 |
+
+这份日志证明所选 GPU 参与了本次推理。自检误报来自引擎过滤仅识别 Compute/3D，漏掉了该驱动的 `Graphics_1`。修正后识别图形/计算引擎名称及其数字后缀，并保留对复制、视频、未知活动和多卡活动的保守判断。
+
+已将四份原始 GPU 计数器快照提取到 `tests/fixtures/gtx1660_gpu_counters.json`（不含图片、文件路径或完整用户日志）。46 项自动化测试通过，其中这份报告的载入和首图数据回放均核验到正确 LUID 与上述增量；其他显卡活动仍判不一致、多卡/未知活动仍不判成功。这是原始日志回归，不是在本机模拟一张 GTX 1660 SUPER。
+
+同一日志在模型下载期间还出现四次 `[Errno 28] No space left on device`，随后成功加载 788,983,561 字节的 ONNX 文件。该下载问题独立于 GPU 引擎漏报。
+
+修正后的 Camie v2 本机 DirectML 对照测试（CPU、自动、手动 NVIDIA、手动 AMD）四组均通过，分数与 CPU 的最大差异仍分别为 NVIDIA `1.49012e-6`、AMD `1.73748e-5`；载入和首图 LUID 核验均通过。报告位于 `logs/directml-graphics-camie/report.json`，测试人员原始日志回放结果位于 `logs/gtx1660-graphics-replay.json`。
+
+修正版分发包为 `dist/TagOps-1.0-DirectML-gpucheck-fix-win64.zip`（97.85 MiB），已校验无 CUDA/PyTorch DLL。解压到新的中文路径后，打包 EXE 的 Camie v2 双图识别、载入/首图 LUID 自检和日志/profile 落盘均通过，报告位于 `logs/frozen-gpu-graphics-fix.json`。旧诊断包保留供对照。

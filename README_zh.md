@@ -56,10 +56,11 @@ PyInstaller 单独放在 uv 的 `build` 依赖组中。默认构建 DirectML 版
 .\scripts\build.ps1
 ```
 
-构建其他运行时可显式传入 `-Backend cuda` 或 `-Backend cpu`。产物位于
-`dist\TagOps\TagOps.exe`。分发时必须打包整个 `dist\TagOps` 目录；其中
-`_internal` 保存 exe 所需的 Python、ONNX Runtime 和 CUDA 运行库。模型、日志及
-可写的历史数据库仍位于 exe 同级目录，并在运行时自动创建。
+脚本生成 `dist\TagOps\TagOps.exe`，并自动创建
+`dist\TagOps-1.1-DirectML-win64.zip`，包含可编辑的 `data/tags_tr.yaml`
+标签翻译表和发布说明。分发完整 ZIP，`_internal` 保存程序所需的运行库。
+模型、日志及历史数据库保存在程序旁边。构建其他运行时需显式传入
+`-Backend cuda` 或 `-Backend cpu`。
 
 ## 目录结构简介
 
@@ -70,7 +71,8 @@ PyInstaller 单独放在 uv 的 `build` 依赖组中。默认构建 DirectML 版
 ├── TagOps.spec             # PyInstaller 打包定义
 ├── scripts/build.ps1       # 可复现、可选后端的打包脚本
 ├── data/
-│   ├── stg.csv             # 中文标签翻译表
+│   ├── tags_tr.yaml        # 可编辑的中文标签翻译表
+│   ├── stg.csv             # 旧版翻译回退表
 │   └── history.db          # 本地运行历史数据库 (SQLite)
 ├── models/                 # 模型权重存放目录 (自动生成)
 └── app/                    # 核心代码

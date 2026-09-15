@@ -1541,16 +1541,25 @@ async function askStartRecognize(n) {
 const USE_NATIVE_DIALOGS = true;
 
 async function nativeDialog(options) {
+    const requestId = (globalThis.crypto && crypto.randomUUID)
+        ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     try {
         const response = await fetch('/api/dialog', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST',
+            // Same ID appears in the backend log for correlating a browser click.
+            headers: { 'Content-Type': 'application/json', 'X-Dialog-Request-ID': requestId },
             body: JSON.stringify(options),
         });
         const result = await response.json();
-        if (!response.ok || result.error) throw new Error(result.error || 'System dialog failed');
+        if (!response.ok || result.error) {
+            console.error('[TAG.OPS] native dialog failed', { requestId, status: response.status, result });
+            throw new Error((result.error || 'System dialog failed') + ` (request ${result.request_id || requestId})`);
+        }
+        console.info('[TAG.OPS] native dialog completed', { requestId, result });
         return result;
     } catch (error) {
         // A failed/cancelled native confirmation must never authorize an action.
+        console.error('[TAG.OPS] native dialog request error', { requestId, error });
         $('pmsg').textContent = error.message;
         return { accepted: false, path: null };
     }

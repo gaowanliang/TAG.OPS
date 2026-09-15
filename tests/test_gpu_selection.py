@@ -94,8 +94,10 @@ class DirectMLSessionTests(unittest.TestCase):
                         patch.object(loader, "_current", None), \
                         patch.object(hardware, "list_provider_gpus", return_value=[]), \
                         patch.object(loader, "list_provider_gpus", return_value=[]), \
+                        patch.object(loader, "log_gpu_environment"), \
                         patch.object(loader, "_download", return_value=[Path("model.onnx")]), \
                         patch.object(loader, "_build_wd14"), \
+                        patch.object(loader, "enable_profile", return_value=False), \
                         patch.object(loader, "_preflight_model"), \
                         patch.object(loader, "model_kind", return_value="wd14"), \
                         self.assertLogs("app.models.loader", level="INFO"):

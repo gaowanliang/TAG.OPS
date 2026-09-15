@@ -1,6 +1,8 @@
 """FastHTML 页面视图（HTML 结构）。"""
 from __future__ import annotations
 
+from ..version import APP_VERSION
+
 from fasthtml.common import (
     Aside,
     Button,
@@ -49,7 +51,7 @@ def _brand():
             P("WD14 · ONNX RUNTIME"),
             cls="brand-text",
         ),
-        Span("v1.0", cls="brand-chip"),
+        Span(f"v{APP_VERSION}", cls="brand-chip"),
         cls="sidebar-brand",
     )
 
@@ -412,6 +414,7 @@ def _topbar():
                     Span("WD14", cls="brand-kw"),
                     cls="brand-sub",
                 ),
+                Span(f"v{APP_VERSION}", cls="brand-version"),
                 cls="topbar-text",
             ),
             cls="topbar-brand",

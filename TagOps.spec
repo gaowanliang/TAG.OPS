@@ -11,8 +11,8 @@ PyInstaller spec — TagOps / Anime Image Classification Evaluation Tool.
 运行布局（分发给客户时用 zip 打包整个 TagOps/ 目录）：
     TagOps/
     ├── TagOps.exe
-    ├── _internal/             ← Python、ONNX Runtime 与 CUDA DLL
-    ├── data/                  ← 首次运行自动生成，保存历史数据库
+    ├── _internal/             ← Python、ONNX Runtime 与所选后端 DLL
+    ├── data/tags_tr.yaml      ← 可编辑的标签翻译表
     ├── models/                ← 首次下载模型时自动生成
     └── logs/                  ← 首次运行自动生成
 
@@ -30,10 +30,33 @@ from PyInstaller.utils.hooks import (
 # Qt 绑定与本项目无关；在任何 hook 运行前先禁止 PyInstaller 的 Qt 自动检测，
 # 避免 onnxruntime / fasthtml 等 collect_all 意外触发 PyQt/PySide hook。
 import os
+import runpy
 os.environ.setdefault("PYINSTALLER_DISABLE_QT_BINDINGS", "1")
 
 from importlib.util import find_spec
 import sys
+from PyInstaller.utils.win32.versioninfo import (
+    FixedFileInfo, StringFileInfo, StringStruct, StringTable,
+    VarFileInfo, VarStruct, VSVersionInfo,
+)
+
+app_version = runpy.run_path(os.path.join(SPECPATH, "app", "version.py"))["APP_VERSION"]
+version_parts = (tuple(int(part) for part in app_version.split(".")) + (0, 0, 0, 0))[:4]
+windows_version = VSVersionInfo(
+    ffi=FixedFileInfo(filevers=version_parts, prodvers=version_parts,
+                     mask=0x3f, flags=0, OS=0x40004, fileType=1, subtype=0, date=(0, 0)),
+    kids=[
+        StringFileInfo([StringTable("040904B0", [
+            StringStruct("FileDescription", "TAG.OPS"),
+            StringStruct("FileVersion", app_version),
+            StringStruct("InternalName", "TagOps"),
+            StringStruct("OriginalFilename", "TagOps.exe"),
+            StringStruct("ProductName", "TAG.OPS"),
+            StringStruct("ProductVersion", app_version),
+        ])]),
+        VarFileInfo([VarStruct("Translation", [0x0409, 1200])]),
+    ],
+)
 
 # ---- 强制带上 _ctypes / ssl 等需要的 Windows 基础 DLL --------------------
 # PyInstaller 偶尔会漏 libffi-8.dll，导致 ImportError: DLL load failed
@@ -184,6 +207,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon="img/icon.png",
+    version=windows_version,
 )
 
 coll = COLLECT(

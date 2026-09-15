@@ -16,9 +16,10 @@ from typing import Dict, List, Optional, Tuple
 import pandas as pd
 
 from ..config import HF_CACHE_DIR, MODELS_DIR, PROVIDER_LABEL
-from ..hardware import preferred_providers, list_provider_gpus
+from ..hardware import preferred_providers, list_provider_gpus, log_gpu_environment
 from ..gpu_check import session_check
 from ..gpu_check import observe_inference
+from ..ort_check import enable_profile, finish_profile
 from ..network import apply_endpoint_env, detect_region
 from .registry import MODEL_REGISTRY, model_files, model_kind, modelscope_id_for
 
@@ -44,6 +45,7 @@ class LoadedModel:
     metadata: Optional[dict] = None
     run_lock: object = field(default_factory=threading.Lock, repr=False)
     device_check: dict = field(default_factory=dict)
+    profile_enabled: bool = False
 
 
 _lock = threading.Lock()
@@ -243,7 +245,18 @@ def _preflight_model(model: LoadedModel) -> None:
         observe_inference(check, run)
     except Exception as exc:
         raise RuntimeError(f"模型载入自检失败：{exc}") from exc
+    finally:
+        if model.profile_enabled:
+            check["execution_check"] = finish_profile(model.session, check["requested_provider"])
+            model.profile_enabled = False
     if check["status"] == "mismatch":
+        raise RuntimeError(f"模型载入自检失败：{check['message']}")
+    execution = check.get("execution_check", {})
+    if (execution.get("status") == "cpu_only"
+            and check["actual_provider"] != "CPUExecutionProvider"):
+        check.update(status="fallback", reason="cpu_only_execution",
+                     message="模型计算全部落在 CPU，已停止加载；请查看 logs 中的算子执行记录")
+        log.error("GPU load check failed: %s", check)
         raise RuntimeError(f"模型载入自检失败：{check['message']}")
     # Keep load-time evidence and independently verify the first real image as well.
     model.device_check = session_check(
@@ -291,6 +304,7 @@ def load_model(name: str, device_id: Optional[int] = None) -> LoadedModel:
                 )
 
         available = ort.get_available_providers()
+        log_gpu_environment()
         providers = preferred_providers(available, device_id)
         target = providers[0]
         target_id = target[1]["device_id"] if isinstance(target, tuple) else None
@@ -298,11 +312,14 @@ def load_model(name: str, device_id: Optional[int] = None) -> LoadedModel:
         target_device = next((g for g in list_provider_gpus(requested_names[0])
                               if g["id"] == target_id), None)
         log.info(
-            "Loading ONNX: %s | device_id=%s | requested providers=%s | available=%s",
-            main_onnx.name, device_id, requested_names, available,
+            "Loading ONNX: model=%s | path=%s | bytes=%s | ORT=%s | device_id=%s"
+            " | requested providers=%s | available=%s | target=%s",
+            name, main_onnx, main_onnx.stat().st_size if main_onnx.exists() else None,
+            getattr(ort, "__version__", "unknown"), device_id, providers, available, target_device,
         )
 
         so = ort.SessionOptions()
+        profile_enabled = enable_profile(so)
         # session 级日志也调到 INFO，方便排查 DML/CUDA 回落 CPU 的原因
         so.log_severity_level = 1
         if "DmlExecutionProvider" in requested_names:
@@ -317,6 +334,7 @@ def load_model(name: str, device_id: Optional[int] = None) -> LoadedModel:
             )
             so_cpu = ort.SessionOptions()
             so_cpu.log_severity_level = 1
+            profile_enabled = enable_profile(so_cpu)
             session = ort.InferenceSession(
                 str(main_onnx), so_cpu, providers=["CPUExecutionProvider"]
             )
@@ -327,7 +345,7 @@ def load_model(name: str, device_id: Optional[int] = None) -> LoadedModel:
         session.disable_fallback()
         used_info = active[0]
         log.info(
-            "Session active providers=%s (%s)",
+            "Session registered providers=%s (%s); operator execution is checked during preflight",
             active, PROVIDER_LABEL.get(used_info, used_info),
         )
 
@@ -353,6 +371,7 @@ def load_model(name: str, device_id: Optional[int] = None) -> LoadedModel:
         else:
             loaded = _build_wd14(name, session, local_files, used_info, device_id)
         loaded.device_check = session_check(session, requested_names[0], target_device)
+        loaded.profile_enabled = profile_enabled
         _preflight_model(loaded)
         _current = loaded
         log.info("GPU session check: %s", _current.device_check)

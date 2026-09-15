@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from pathlib import Path
 import subprocess
 import sys
@@ -18,6 +19,7 @@ sys.path.insert(0, str(ROOT))
 
 
 def worker(args):
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     import numpy as np
     from PIL import Image
     from unittest.mock import patch
@@ -102,13 +104,18 @@ def main():
                     (g for g in devices if str(g["id"]) == mode), None
                 )
                 check = report["device_check"]
+                execution = check.get("preflight", {}).get("execution_check", {})
+                report["execution_profile_ok"] = (
+                    execution.get("status") == ("cpu_only" if mode == "cpu" else "provider_observed")
+                )
                 identity_ok = mode == "cpu" or (
                     report["provider"] == "DmlExecutionProvider"
                     and check.get("expected_device", {}).get("id") == target["id"]
                     and check["status"] == "verified"
                     and check["preflight"]["status"] == "verified"
                 )
-                report["passed"] = bool(identity_ok and report["finite"] and report["cpu_close"]
+                report["passed"] = bool(identity_ok and report["execution_profile_ok"]
+                    and report["finite"] and report["cpu_close"]
                     and report["different_image_max_delta"] > 1e-4
                     and report["repeat_max_delta"] < 1e-5)
                 print(f"{mode}: passed={report['passed']}, check={check['status']}, "

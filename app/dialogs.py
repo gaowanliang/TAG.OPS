@@ -10,11 +10,16 @@ _dialog_lock = threading.Lock()
 log = logging.getLogger(__name__)
 
 def show_native_dialog(kind: str, title: str, message: str = "", initial_path: str = "") -> dict:
+    log.info("Native dialog request kind=%s title=%r message_length=%d initial_path=%r",
+             kind, title, len(message), initial_path)
     if kind not in ("alert", "confirm", "folder"):
+        log.warning("Native dialog rejected: unsupported kind=%r", kind)
         raise ValueError("不支持的对话框类型")
     if os.name != "nt":
+        log.error("Native dialog unavailable: os.name=%s", os.name)
         raise OSError("系统对话框当前仅支持 Windows")
     with _dialog_lock:
+        log.debug("Native dialog lock acquired kind=%s", kind)
         if kind == "folder":
             from .windows_shell import pick_folder
             log.info("Opening Windows Explorer folder picker, initial_path=%r", initial_path)
@@ -27,6 +32,7 @@ def show_native_dialog(kind: str, title: str, message: str = "", initial_path: s
         # TOPMOST | SETFOREGROUND; confirm defaults to Cancel, including Escape/close.
         flags = 0x40000 | 0x10000 | 0x40 | (0x1 | 0x100 if kind == "confirm" else 0)
         result = show(None, message, title, flags)
+        log.info("MessageBox returned kind=%s result=%s flags=0x%08x", kind, result, flags)
         if result == 0:
             raise ctypes.WinError(ctypes.get_last_error())
         return {"accepted": result == 1}
