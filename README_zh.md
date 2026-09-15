@@ -18,7 +18,7 @@
 
 ## 特性
 
-- **开箱即用**：单文件一键启动，自动打开本地 Web UI (`http://127.0.0.1:8765`)。
+- **开箱即用**：一键启动，自动打开本地 Web UI (`http://127.0.0.1:8765`)。
 - **智能识别与管理**：
   - **双模式导入**：支持指定文件夹（含递归扫描）或直接拖拽图片。
   - **哈希去重**：利用 `xxh3_64` 算法对图片进行哈希计算。不论文件移动或重命名，均可跳过已处理图片，实现极速重扫。
@@ -29,26 +29,46 @@
 
 ## 安装与启动
 
-1. **安装依赖**
+1. **安装 uv 并同步 DirectML 环境**
 
 ```bash
-pip install -r requirements.txt
+pip install uv
+uv sync --extra directml
 ```
+
+Windows 默认使用 DirectML。纯 CPU 环境可使用 `uv sync --extra cpu`；如需专用
+NVIDIA CUDA 构建，可使用 `uv sync --extra cuda`。这些运行时选项互斥，不能同时启用。
 
 2. **启动应用**
 
 ```bash
-python main.py
+uv run --extra directml python main.py
 ```
 
 启动后，浏览器会自动打开 `http://127.0.0.1:8765`。
 _初次运行会自动下载所需的模型文件至 `models/` 目录下。_
 
+## 打包 Windows 可执行程序
+
+PyInstaller 单独放在 uv 的 `build` 依赖组中。默认构建 DirectML 版：
+
+```powershell
+.\scripts\build.ps1
+```
+
+构建其他运行时可显式传入 `-Backend cuda` 或 `-Backend cpu`。产物位于
+`dist\TagOps\TagOps.exe`。分发时必须打包整个 `dist\TagOps` 目录；其中
+`_internal` 保存 exe 所需的 Python、ONNX Runtime 和 CUDA 运行库。模型、日志及
+可写的历史数据库仍位于 exe 同级目录，并在运行时自动创建。
+
 ## 目录结构简介
 
 ```text
 ├── main.py                 # 入口文件
-├── requirements.txt        # 依赖清单
+├── pyproject.toml          # 项目元数据与依赖声明
+├── uv.lock                 # 可复现的依赖锁文件
+├── TagOps.spec             # PyInstaller 打包定义
+├── scripts/build.ps1       # 可复现、可选后端的打包脚本
 ├── data/
 │   ├── stg.csv             # 中文标签翻译表
 │   └── history.db          # 本地运行历史数据库 (SQLite)
@@ -61,7 +81,7 @@ _初次运行会自动下载所需的模型文件至 `models/` 目录下。_
 
 ## 技术栈
 
-- **后端**: Python 3.10+, [python-fasthtml](https://pypi.org/project/python-fasthtml/), Uvicorn, onnxruntime, huggingface_hub
+- **后端**: Python 3.11–3.13, [python-fasthtml](https://pypi.org/project/python-fasthtml/), Uvicorn, ONNX Runtime, huggingface_hub
 - **前端**: 原生 HTML/JS/CSS，无 Node 依赖，轻量级
 - **模型支持**: WD14 家族 (SmilingWolf), camie-tagger-v2 (Camais03)
 

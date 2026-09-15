@@ -1,0 +1,63 @@
+[project]
+name = "anime-image-classification-evaluation-tool"
+version = "0.1.0"
+description = "A local-first anime image auto-tagging and classification workbench"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "certifi>=2024.1.1",
+    "huggingface-hub>=1.0.0",
+    "modelscope>=1.14.0",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "pillow>=10.0",
+    "python-fasthtml>=0.13.0",
+    "pyyaml>=6.0",
+    "starlette>=1.0.0",
+    "uvicorn>=0.44.0",
+    "xxhash>=3.0",
+]
+
+[project.optional-dependencies]
+cuda = [
+    "onnxruntime-gpu>=1.27.0",
+    "torch==2.13.0",
+]
+directml = [
+    "onnxruntime-directml>=1.23.0",
+]
+cpu = [
+    "onnxruntime>=1.23.0",
+]
+
+[dependency-groups]
+build = [
+    "pyinstaller>=6.0",
+]
+
+[tool.uv]
+default-groups = []
+conflicts = [
+    [
+        { extra = "cuda" },
+        { extra = "directml" },
+    ],
+    [
+        { extra = "cuda" },
+        { extra = "cpu" },
+    ],
+    [
+        { extra = "directml" },
+        { extra = "cpu" },
+    ],
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://mirrors.nju.edu.cn/pytorch/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu130", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+]

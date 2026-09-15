@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import shutil
+import sys
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -15,7 +16,9 @@ from typing import Dict, List, Optional, Tuple
 import pandas as pd
 
 from ..config import HF_CACHE_DIR, MODELS_DIR, PROVIDER_LABEL
-from ..hardware import preferred_providers
+from ..hardware import preferred_providers, list_provider_gpus
+from ..gpu_check import session_check
+from ..gpu_check import observe_inference
 from ..network import apply_endpoint_env, detect_region
 from .registry import MODEL_REGISTRY, model_files, model_kind, modelscope_id_for
 
@@ -39,6 +42,8 @@ class LoadedModel:
     idx_to_tag: Optional[Dict[str, str]] = None
     tag_to_category: Optional[Dict[str, str]] = None
     metadata: Optional[dict] = None
+    run_lock: object = field(default_factory=threading.Lock, repr=False)
+    device_check: dict = field(default_factory=dict)
 
 
 _lock = threading.Lock()
@@ -74,7 +79,7 @@ def _download_from_modelscope(name: str, cfg: dict) -> List[Path]:
         from modelscope import snapshot_download  # type: ignore
     except ImportError:
         raise RuntimeError(
-            "未安装 modelscope，请执行: pip install modelscope"
+            "未安装 modelscope，请使用 uv 重新同步当前运行环境"
         )
 
     ms_id = modelscope_id_for(cfg)
@@ -211,6 +216,42 @@ def _build_camie_v2(name: str, session, local_files: List[Path], provider: str,
 
 
 # ------------------------------------------------------------- load / unload
+def _preflight_model(model: LoadedModel) -> None:
+    """Execute a deterministic synthetic input before accepting real tagging work."""
+    import numpy as np
+    from PIL import Image
+    from ..preprocess import preprocess, preprocess_camie
+
+    pixels = np.random.default_rng(0).integers(0, 256, (64, 64, 3), dtype=np.uint8)
+    prepare = preprocess_camie if model.kind == "camie_v2" else preprocess
+    with Image.fromarray(pixels) as image:
+        tensor = prepare(image, model.input_size)
+    check = model.device_check
+    check["phase"] = "load"
+    if check["status"] == "mismatch":
+        raise RuntimeError(f"模型载入自检失败：{check['message']}")
+    if check["status"] == "pending":
+        check["message"] = "模型载入自检中"
+
+    def run():
+        outputs = model.session.run(None, {model.session.get_inputs()[0].name: tensor})
+        if not outputs or any(np.size(out) == 0 or not np.isfinite(out).all() for out in outputs):
+            raise RuntimeError("模型载入自检失败：推理输出为空或包含 NaN/Inf")
+        return outputs
+
+    try:
+        observe_inference(check, run)
+    except Exception as exc:
+        raise RuntimeError(f"模型载入自检失败：{exc}") from exc
+    if check["status"] == "mismatch":
+        raise RuntimeError(f"模型载入自检失败：{check['message']}")
+    # Keep load-time evidence and independently verify the first real image as well.
+    model.device_check = session_check(
+        model.session, check["requested_provider"], check["expected_device"]
+    )
+    model.device_check.update(phase="image", preflight=check)
+
+
 def load_model(name: str, device_id: Optional[int] = None) -> LoadedModel:
     """确保指定模型已加载（线程安全）；切换模型或 device_id 时重新创建 session。"""
     global _current
@@ -230,9 +271,32 @@ def load_model(name: str, device_id: Optional[int] = None) -> LoadedModel:
 
         import onnxruntime as ort
 
+        # CUDA 版 ORT 可从 PyTorch 的目录加载配套 CUDA/cuDNN DLL；CUDA extra
+        # 使用 cu130 wheels，因此必须在创建 InferenceSession 前完成预加载。
+        preload_dlls = getattr(ort, "preload_dlls", None)
+        if callable(preload_dlls):
+            try:
+                preload_kwargs = {}
+                if getattr(sys, "frozen", False):
+                    bundle_root = Path(sys._MEIPASS)  # type: ignore[attr-defined]
+                    torch_lib = bundle_root / "torch" / "lib"
+                    if torch_lib.is_dir():
+                        preload_kwargs["directory"] = str(torch_lib)
+                preload_dlls(**preload_kwargs)
+            except Exception:
+                # DirectML / CPU 环境不依赖这些 DLL，不应因预加载失败而中止。
+                log.warning(
+                    "Failed to preload ONNX Runtime accelerator DLLs",
+                    exc_info=True,
+                )
+
         available = ort.get_available_providers()
         providers = preferred_providers(available, device_id)
+        target = providers[0]
+        target_id = target[1]["device_id"] if isinstance(target, tuple) else None
         requested_names = [p[0] if isinstance(p, tuple) else p for p in providers]
+        target_device = next((g for g in list_provider_gpus(requested_names[0])
+                              if g["id"] == target_id), None)
         log.info(
             "Loading ONNX: %s | device_id=%s | requested providers=%s | available=%s",
             main_onnx.name, device_id, requested_names, available,
@@ -241,6 +305,9 @@ def load_model(name: str, device_id: Optional[int] = None) -> LoadedModel:
         so = ort.SessionOptions()
         # session 级日志也调到 INFO，方便排查 DML/CUDA 回落 CPU 的原因
         so.log_severity_level = 1
+        if "DmlExecutionProvider" in requested_names:
+            so.enable_mem_pattern = False
+            so.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
         try:
             session = ort.InferenceSession(str(main_onnx), so, providers=providers)
         except Exception as e:
@@ -256,6 +323,8 @@ def load_model(name: str, device_id: Optional[int] = None) -> LoadedModel:
             _ = e  # 保留异常以便在日志中查阅
 
         active = session.get_providers()
+        # Later Run failures must not silently move a verified session to another device.
+        session.disable_fallback()
         used_info = active[0]
         log.info(
             "Session active providers=%s (%s)",
@@ -280,9 +349,13 @@ def load_model(name: str, device_id: Optional[int] = None) -> LoadedModel:
 
         kind = model_kind(MODEL_REGISTRY[name])
         if kind == "camie_v2":
-            _current = _build_camie_v2(name, session, local_files, used_info, device_id)
+            loaded = _build_camie_v2(name, session, local_files, used_info, device_id)
         else:
-            _current = _build_wd14(name, session, local_files, used_info, device_id)
+            loaded = _build_wd14(name, session, local_files, used_info, device_id)
+        loaded.device_check = session_check(session, requested_names[0], target_device)
+        _preflight_model(loaded)
+        _current = loaded
+        log.info("GPU session check: %s", _current.device_check)
         return _current
 
 

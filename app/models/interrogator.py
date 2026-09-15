@@ -8,15 +8,17 @@ from PIL import Image
 
 from ..preprocess import preprocess, preprocess_camie
 from .loader import LoadedModel
+from ..gpu_check import observe_inference
 
 
 def interrogate(
     model: LoadedModel, image: Image.Image
 ) -> Tuple[Dict[str, float], Dict[str, float]]:
     """对单张图像推理，返回 (ratings, regular_tags)。"""
-    if model.kind == "camie_v2":
-        return _interrogate_camie(model, image)
-    return _interrogate_wd14(model, image)
+    infer = _interrogate_camie if model.kind == "camie_v2" else _interrogate_wd14
+    # Serialize the first self-check and DirectML Run calls on a shared session.
+    with model.run_lock:
+        return observe_inference(model.device_check, lambda: infer(model, image))
 
 
 # ------------------------------------------------------------- WD14

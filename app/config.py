@@ -14,10 +14,13 @@ URL = f"http://{HOST}:{PORT}"
 #   PyInstaller：ROOT = 可执行文件所在目录（数据/模型放在 exe 旁边，可写）
 if getattr(sys, "frozen", False):
     ROOT = Path(sys.executable).resolve().parent
+    BUNDLE_ROOT = Path(sys._MEIPASS).resolve()  # type: ignore[attr-defined]
 else:
     ROOT = Path(__file__).resolve().parents[1]
+    BUNDLE_ROOT = ROOT
 
 DATA_DIR = ROOT / "data"
+BUNDLED_DATA_DIR = BUNDLE_ROOT / "data"
 MODELS_DIR = ROOT / "models"
 HF_CACHE_DIR = MODELS_DIR / "_hf_cache"
 STATIC_DIR = Path(__file__).resolve().parent / "web" / "static"

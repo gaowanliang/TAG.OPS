@@ -1,7 +1,7 @@
 """
 Anime Image Classification Evaluation Tool — 启动入口。
 
-    python main.py
+    uv run --extra directml python main.py
 
 浏览器会自动打开 http://127.0.0.1:8765
 """

@@ -126,6 +126,8 @@ def _path_card():
             cls="row",
         ),
         Div(id="scan-info", cls="mono", style="margin-top:6px"),
+        P("只有文件夹模式支持查看分类；直接拖入或上传图片不支持。请使用“浏览”选择文件夹后识别。",
+          cls="muted", **{"data-i18n": "info.folder_only"}),
         Div(
             Div("OR · 拖放图片到页面任意位置", cls="or-label",
                 **{"data-i18n": "label.or_drop"}),
@@ -289,6 +291,8 @@ def _history_section():
 
 def _category_section():
     return Section(
+        P("只有文件夹模式支持查看分类；直接拖入或上传图片不支持。请使用“浏览”选择文件夹后识别。",
+          cls="muted", **{"data-i18n": "info.folder_only"}),
         Div(
             Div(
                 Label("前 N 个标签", **{"data-i18n": "label.top_n"}),
@@ -556,6 +560,8 @@ def _drop_overlay():
                 **{"data-i18n": "drop.title"}),
             Div("松开即可添加", cls="drop-overlay-sub mono",
                 **{"data-i18n": "drop.sub"}),
+            Div("只有文件夹模式支持查看分类；直接拖入或上传图片不支持。",
+                cls="drop-overlay-sub mono", **{"data-i18n": "info.folder_only"}),
             cls="drop-overlay-inner",
         ),
         id="drop-overlay",

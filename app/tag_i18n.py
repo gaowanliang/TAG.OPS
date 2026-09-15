@@ -24,11 +24,12 @@ from typing import Dict
 
 import yaml
 
-from .config import DATA_DIR
+from .config import BUNDLED_DATA_DIR, DATA_DIR
 
 _CACHE: Dict[str, Dict[str, str]] | None = None
 _YAML = DATA_DIR / "tags_tr.yaml"
 _CSV = DATA_DIR / "stg.csv"
+_BUNDLED_YAML = BUNDLED_DATA_DIR / "tags_tr.yaml"
 
 
 def _normalize(name: str) -> str:
@@ -81,7 +82,28 @@ def load() -> Dict[str, Dict[str, str]]:
     global _CACHE
     if _CACHE is not None:
         return _CACHE
-    table = _load_yaml() if _YAML.exists() else _load_csv()
+    if _YAML.exists():
+        table = _load_yaml()
+    elif _CSV.exists():
+        table = _load_csv()
+    else:
+        # PyInstaller 分发中内置一份只读默认翻译；exe 旁的 data 文件优先，
+        # 因此用户仍可覆盖或更新翻译。
+        try:
+            raw = yaml.safe_load(_BUNDLED_YAML.read_text(encoding="utf-8"))
+        except Exception:
+            raw = {}
+        table = {}
+        if isinstance(raw, dict):
+            for cat_zh, group in raw.items():
+                if not isinstance(group, dict):
+                    continue
+                for name, zh in group.items():
+                    if name is not None and zh is not None:
+                        table[_normalize(str(name))] = {
+                            "zh": str(zh),
+                            "category_zh": str(cat_zh),
+                        }
     _CACHE = table
     return table
 

@@ -18,7 +18,7 @@ Runs entirely local using ONNX Runtime. Supports DirectML, CUDA, and CPU fall-ba
 
 ## Features
 
-- **Ready to Use**: Single-file launcher that automatically opens a local Web UI at `http://127.0.0.1:8765`.
+- **Ready to Use**: One-click launcher that automatically opens a local Web UI at `http://127.0.0.1:8765`.
 - **Smart Tagging & Organization**:
   - **Flexible Import**: Point to a directory (with optional recursion) or drop your images straight into the UI.
   - **Hash-based Caching**: Images are hashed via `xxh3_64`. Re-running a folder will skip previously tagged files based on content hash, completely ignoring renames or moves.
@@ -29,26 +29,49 @@ Runs entirely local using ONNX Runtime. Supports DirectML, CUDA, and CPU fall-ba
 
 ## Installation & Usage
 
-1. **Install Dependencies**
+1. **Install uv and Sync the CUDA Environment**
 
 ```bash
-pip install -r requirements.txt
+pip install uv
+uv sync --extra directml
 ```
+
+The CUDA environment uses the PyTorch CUDA 13.0 (`cu130`) wheels. For a
+different ONNX Runtime backend, use `uv sync --extra directml` on Windows or
+`uv sync --extra cpu`. These runtime extras are mutually exclusive.
 
 2. **Start the Application**
 
 ```bash
-python main.py
+uv run --extra directml python main.py
 ```
 
 Your browser will automatically open `http://127.0.0.1:8765`.
 _Models will be downloaded automatically to the `models/` directory on the first run._
 
+## Build the Windows Executable
+
+PyInstaller is isolated in uv's `build` dependency group. Build the CUDA
+distribution with:
+
+```powershell
+.\scripts\build.ps1
+```
+
+Use `directml` or `cpu` instead when building those runtime variants. The
+result is `dist\TagOps\TagOps.exe`. Distribute the entire `dist\TagOps`
+directory: `_internal` contains the Python, ONNX Runtime, and CUDA libraries
+required by the executable. Models, logs, and the writable history database
+remain next to the executable and are created at runtime.
+
 ## Project Structure
 
 ```text
 ├── main.py                 # Application entrypoint
-├── requirements.txt        # Python dependencies
+├── pyproject.toml          # Project metadata and dependency definitions
+├── uv.lock                 # Reproducible dependency lockfile
+├── TagOps.spec             # PyInstaller build definition
+├── scripts/build.ps1       # Reproducible backend-aware build command
 ├── data/
 │   ├── stg.csv             # Tag to Chinese translation table
 │   └── history.db          # Generated SQLite history tracking
@@ -61,7 +84,7 @@ _Models will be downloaded automatically to the `models/` directory on the first
 
 ## Tech Stack
 
-- **Backend**: Python 3.10+, [python-fasthtml](https://pypi.org/project/python-fasthtml/), Uvicorn, onnxruntime, huggingface_hub
+- **Backend**: Python 3.11–3.13, [python-fasthtml](https://pypi.org/project/python-fasthtml/), Uvicorn, ONNX Runtime, huggingface_hub
 - **Frontend**: Vanilla JS/CSS (no Node or build steps required)
 - **Supported Models**: WD14 family (SmilingWolf), camie-tagger-v2 (Camais03)
 

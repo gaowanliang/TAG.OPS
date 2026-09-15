@@ -28,6 +28,8 @@ class Job:
     results: List[dict] = field(default_factory=list)
     # path / 文件名 → results 列表中的索引，便于详情页懒查
     by_key: Dict[str, int] = field(default_factory=dict)
+    device_check: dict = field(default_factory=dict)
+    source: str = "upload"
 
 
 @dataclass
@@ -81,7 +83,7 @@ def create_folder_batch_job(
     paths: List[str], options: FolderBatchOptions
 ) -> Job:
     """文件夹批量（本地路径），key = 绝对路径。"""
-    job = Job(id=uuid.uuid4().hex, total=len(paths))
+    job = Job(id=uuid.uuid4().hex, total=len(paths), source="folder")
     _register(job)
     threading.Thread(
         target=_run_folder, args=(job, paths, options), daemon=True
@@ -121,6 +123,7 @@ def interrogate_one(
             "format": fmt, "file_size": file_size,
         },
         "provider": model.provider,
+        "device_check": model.device_check,
     }
 
 
@@ -132,6 +135,7 @@ def _run_upload(
         job.status = "running"
         job.message = f"加载模型 {opts.model} ..."
         model = load_model(opts.model, device_id=opts.device_id)
+        job.device_check = model.device_check
         job.message = f"已加载 [{model.provider}]，开始识别"
 
         for i, (fname, data) in enumerate(files):
@@ -196,6 +200,7 @@ def _run_folder(
         job.status = "running"
         job.message = f"加载模型 {opts.model} ..."
         model = load_model(opts.model, device_id=opts.device_id)
+        job.device_check = model.device_check
         job.message = f"已加载 [{model.provider}]，开始识别"
 
         # 预扫 tagging_results/，准备哈希缓存（skip_existing 才用到）

@@ -18,8 +18,6 @@ pip-wheel-metadata/
 pip-log.txt
 pip-delete-this-directory.txt
 *.spec.bak
-TagOps.spec
-*.spec
 .pytest_cache/
 .coverage
 .coverage.*

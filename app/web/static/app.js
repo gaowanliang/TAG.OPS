@@ -203,9 +203,11 @@ const STRINGS = {
     'info.empty_grid':   { zh: '扫描一个文件夹或上传图片开始 SYS_READY_.',
                            en: 'Scan a folder or drop images to start. SYS_READY_.' },
     'info.empty_cat':    { zh: '没有符合条件的分类', en: 'No matching categories' },
+    'info.folder_only':  { zh: '只有文件夹模式支持查看分类；直接拖入或上传图片不支持。请使用“浏览”选择文件夹后识别。',
+                          en: 'Categories are available only in folder mode. Dragged or uploaded images are not supported. Browse to a folder and run recognition.' },
     'info.total_tags':   { zh: '共 {n} 个标签',       en: '{n} tags total' },
     'info.auto_select':  { zh: '自动选择',            en: 'Auto-select' },
-    'info.auto_ort':     { zh: '自动 (由 ORT 选择)', en: 'Auto (pick by ORT)' },
+    'info.auto_ort':     { zh: '自动 (优先显存最大的显卡)', en: 'Auto (largest GPU memory)' },
     'info.no_gpu':       { zh: '无显卡',              en: 'No GPU' },
     'info.available':    { zh: '{n} 可用',            en: '{n} available' },
     'info.none':         { zh: '无',                  en: 'None' },
@@ -331,13 +333,15 @@ function renderRecentPaths() {
 
 // ---- hardware / models bootstrap ----
 let HW_CACHE = null;
+let GPU_CHECK_CACHE = null;
 
 async function loadHardware() {
     const r = await fetch('/api/hardware');
     const d = await r.json();
     HW_CACHE = d;
-    renderHardware(d);
+    GPU_CHECK_CACHE = d.device_check || null;
     populateGpuSelect(d);
+    renderHardware(d);
 }
 
 function renderHardware(d) {
@@ -389,7 +393,7 @@ function renderHardware(d) {
         label: `GPU × ${gpus.length}`,
         value: hasSel && gpus.length
             ? (gpus.find(g => g.id === selectedId)?.name || `GPU ${selectedId}`)
-            : (gpus.length ? t('info.auto_select') : t('info.no_gpu')),
+            : (d.auto_device ? `${t('info.auto_select')} · ${d.auto_device.name}` : t('info.no_gpu')),
         sub: null,
         badge: gpus.length ? String(gpus.length) : '0',
         badgeCls: 'gpu',
@@ -402,7 +406,7 @@ function renderHardware(d) {
                 class: 'hw-gpu-item' + (hasSel && selectedId === g.id ? ' selected' : ''),
             },
                 h('span', { class: 'hw-gpu-index' }, String(g.id)),
-                h('span', { class: 'hw-gpu-name', title: g.name }, g.name),
+                h('span', { class: 'hw-gpu-name', title: g.name }, gpuLabel(g)),
             ));
         }
         gpuStat.append(list);
@@ -410,6 +414,7 @@ function renderHardware(d) {
     box.append(gpuStat);
 
     if (d.error) box.append(h('div', { class: 'err' }, d.error));
+    if (GPU_CHECK_CACHE) renderGpuCheck(GPU_CHECK_CACHE);
 }
 
 function stat({ label, value, sub, badge, badgeCls = '', full = false }) {
@@ -428,15 +433,61 @@ function populateGpuSelect(d) {
     const sel = $('gpu-device');
     if (!sel) return;
     const gpus = d.gpus_indexed || [];
+    // Invalidate legacy WMI IDs and selections from a different device list/backend.
+    const deviceMap = JSON.stringify([d.selected, gpus]);
+    if (localStorage.getItem('aict_device_map') !== deviceMap) {
+        localStorage.removeItem('aict_device_id');
+        localStorage.setItem('aict_device_map', deviceMap);
+    }
     sel.innerHTML = `<option value="">${t('info.auto_ort')}</option>`
-        + gpus.map(g => `<option value="${g.id}">[${g.id}] ${esc(g.name)}</option>`).join('');
+        + gpus.map(g => `<option value="${g.id}">[${g.id}] ${esc(gpuLabel(g))}</option>`).join('');
     const saved = localStorage.getItem('aict_device_id');
-    if (saved !== null) sel.value = saved;
+    if (saved !== null && gpus.some(g => String(g.id) === saved)) sel.value = saved;
+    else localStorage.removeItem('aict_device_id');
     sel.onchange = () => {
+        GPU_CHECK_CACHE = null;
         if (sel.value === '') localStorage.removeItem('aict_device_id');
         else localStorage.setItem('aict_device_id', sel.value);
         if (HW_CACHE) renderHardware(HW_CACHE);
     };
+}
+
+function gpuLabel(g) {
+    return g.name + (g.memory_bytes != null ? ` · ${(g.memory_bytes / 2 ** 30).toFixed(1)} GiB` : '');
+}
+
+function renderGpuCheck(check) {
+    if (!check?.status) return;
+    GPU_CHECK_CACHE = check;
+    let box = $('gpu-check');
+    if (!box) {
+        box = h('div', { id: 'gpu-check', class: 'hw-full' });
+        $('hw').append(box);
+    }
+    const names = {
+        pending: ['等待首图自检', 'Awaiting first inference'],
+        verified: ['已观测到所选显卡计算', 'Selected GPU activity observed'],
+        mismatch: ['显卡核验不一致', 'GPU verification mismatch'],
+        fallback: ['推理后端已回退', 'Execution provider fallback'],
+        unverified: ['尚未验证实际显卡', 'GPU activity unverified'],
+        cpu: ['使用 CPU', 'Running on CPU'],
+    };
+    const label = names[check.status] || names.unverified;
+    const expected = check.expected_device;
+    const observed = (check.observed_devices || []).map(g => g.name).join(', ');
+    const preflight = check.preflight;
+    const preflightText = preflight
+        ? `${state.lang === 'en' ? 'Load check' : '载入自检'}: ${(names[preflight.status] || names.unverified)[state.lang === 'en' ? 1 : 0]} · `
+        : '';
+    box.replaceChildren(stat({
+        label: state.lang === 'en' ? 'LAST INFERENCE GPU CHECK' : '最近一次推理 GPU 自检',
+        value: label[state.lang === 'en' ? 1 : 0],
+        sub: preflightText + `${expected ? gpuLabel(expected) : '—'} → ${observed || check.actual_provider}`
+            + (state.lang === 'en' ? '' : ` · ${check.message}`),
+        badge: check.status === 'verified' ? '✓' : '·',
+        badgeCls: check.status === 'verified' ? 'accel' : 'warn',
+        full: true,
+    }));
 }
 
 function updateTopbarStatus() { /* no-op: chips removed */ }
@@ -749,6 +800,8 @@ async function runFolderBatch(extra = {}) {
     const d = await r.json();
     if (d.error) { await showAlert(d.error); return; }
     state.jobId = d.job_id;
+    GPU_CHECK_CACHE = null;
+    $('gpu-check')?.remove();
     pollJob();
 }
 
@@ -767,6 +820,8 @@ async function runUpload() {
     const d = await r.json();
     if (d.error) { await showAlert(d.error); return; }
     state.jobId = d.job_id;
+    GPU_CHECK_CACHE = null;
+    $('gpu-check')?.remove();
     switchView('grid');
     renderGrid();
     pollJob();
@@ -777,6 +832,7 @@ async function pollJob() {
     if (!state.jobId) return;
     const r = await fetch('/api/status?id=' + state.jobId);
     const d = await r.json();
+    renderGpuCheck(d.device_check);
     const prog = $('progress');
     prog.max = d.total; prog.value = d.done;
     $('pmsg').textContent = `${d.status} — ${d.done}/${d.total} · ${d.message || ''}`;
@@ -930,6 +986,7 @@ async function openDetail(key) {
             return;
         }
         state.byKey[key] = r;
+        renderGpuCheck(r.device_check);
     }
     renderDetail(r);
 }
@@ -1051,6 +1108,10 @@ function switchView(view) {
 
 // ---- category view ----
 async function refreshCategories() {
+    if (state.source !== 'scan' && state.source !== 'history') {
+        await showAlert(t('info.folder_only'));
+        return;
+    }
     let url;
     if (state.source === 'history' && state.historyId) {
         url = `/api/categorize?history_id=${state.historyId}`;
@@ -1314,7 +1375,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('page-size').addEventListener('change', () => { state.page = 1; renderGrid(); });
 
     $('tab-grid').addEventListener('click', () => switchView('grid'));
-    $('tab-category').addEventListener('click', () => {
+    $('tab-category').addEventListener('click', async () => {
+        if (state.source !== 'scan' && state.source !== 'history') {
+            await showAlert(t('info.folder_only'));
+            return;
+        }
         switchView('category');
         if (!Object.keys(state.categories).length) refreshCategories();
     });
@@ -1472,9 +1537,29 @@ async function askStartRecognize(n) {
 }
 
 // ---- dialog (modal alert / confirm) ----
+// Keep the legacy modals available in source, but inactive and hidden for now.
+const USE_NATIVE_DIALOGS = true;
+
+async function nativeDialog(options) {
+    try {
+        const response = await fetch('/api/dialog', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(options),
+        });
+        const result = await response.json();
+        if (!response.ok || result.error) throw new Error(result.error || 'System dialog failed');
+        return result;
+    } catch (error) {
+        // A failed/cancelled native confirmation must never authorize an action.
+        $('pmsg').textContent = error.message;
+        return { accepted: false, path: null };
+    }
+}
+
 let dialogResolve = null;
 
 function initDialog() {
+    if (USE_NATIVE_DIALOGS) return;
     const modal = $('dialog-modal');
     modal.addEventListener('click', (e) => {
         if (e.target.id === 'dialog-modal') closeDialog(false);
@@ -1495,6 +1580,10 @@ function closeDialog(result) {
 }
 
 function openDialog({ title, body, buttons }) {
+    if (USE_NATIVE_DIALOGS) {
+        return nativeDialog({ kind: buttons.length > 1 ? 'confirm' : 'alert',
+            title, message: String(body) }).then(result => result.accepted === true);
+    }
     return new Promise((resolve) => {
         dialogResolve = resolve;
         $('dialog-title').textContent = title;
@@ -1545,7 +1634,7 @@ const browser = {
     suggestedName: '',    // 「用标签名」按钮用到的名字（分类详情触发时传入）
 };
 
-function openBrowser(opts = {}) {
+async function openBrowser(opts = {}) {
     // 兼容：传字符串等价于 { targetId: string }
     if (typeof opts === 'string') opts = { targetId: opts };
     browser.targetId = opts.targetId || null;
@@ -1554,6 +1643,16 @@ function openBrowser(opts = {}) {
     const seedId = browser.targetId || 'folder-path';
     const seedEl = $(seedId);
     const cur = seedEl ? seedEl.value.trim() : '';
+    if (USE_NATIVE_DIALOGS) {
+        const result = await nativeDialog({
+            kind: 'folder', initial_path: cur,
+            title: t('msg.pick_folder') + (opts.suggestedName ? ` · ${opts.suggestedName}` : ''),
+        });
+        if (!result.path) return;
+        if (opts.onPick) await opts.onPick(result.path);
+        else if (seedEl) seedEl.value = result.path;
+        return;
+    }
     $('browser-modal').hidden = false;
     // 重置 mkdir 输入 & 「用标签名」按钮可用性
     const nameInput = $('mkdir-name');
@@ -1567,6 +1666,7 @@ function closeBrowser() { $('browser-modal').hidden = true; }
 
 function initFolderBrowser() {
     $('btn-browse').addEventListener('click', () => openBrowser('folder-path'));
+    if (USE_NATIVE_DIALOGS) return;
     $('browser-close').addEventListener('click', closeBrowser);
     $('browser-cancel').addEventListener('click', closeBrowser);
     $('browser-pick').addEventListener('click', async () => {

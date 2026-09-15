@@ -2,19 +2,22 @@
 from __future__ import annotations
 
 import traceback
+import logging
 from dataclasses import asdict
 from pathlib import Path
 from typing import List, Tuple
 
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, Response
+from starlette.concurrency import run_in_threadpool
+from urllib.parse import urlsplit
 
 from .. import fs, jobs, thumbs
 from ..clustering import categorize_by_top_n
 from ..fs import is_image
 from ..hardware import detect_hardware
 from ..jobs import BatchOptions, FolderBatchOptions
-from ..models import MODEL_REGISTRY, list_models, models_info
+from ..models import MODEL_REGISTRY, list_models, models_info, current_model
 from .. import tag_i18n
 from .views import home_page
 
@@ -45,6 +48,7 @@ def _job_snapshot(job: jobs.Job, include_results: bool = True) -> dict:
         "id": job.id,
         "status": job.status,
         "message": job.message,
+        "device_check": job.device_check,
         "done": job.done,
         "total": job.total,
     }
@@ -57,6 +61,33 @@ def _job_snapshot(job: jobs.Job, include_results: bool = True) -> dict:
 def register(app, rt):
     """把所有路由挂到 FastHTML app 上。"""
 
+    @app.post("/api/dialog")
+    async def _native_dialog(request: Request):
+        # Desktop dialogs may only be opened by this local application's page.
+        origin = request.headers.get("origin")
+        if (request.url.hostname not in ("127.0.0.1", "localhost", "::1")
+                or (origin and urlsplit(origin).netloc != request.url.netloc)
+                or request.headers.get("content-type", "").split(";")[0] != "application/json"):
+            return JSONResponse({"error": "仅允许本地应用打开系统对话框"}, status_code=403)
+        from ..dialogs import show_native_dialog
+        try:
+            body = await request.json()
+            if not isinstance(body, dict):
+                raise ValueError("无效请求")
+            kind = body.get("kind")
+            if kind not in ("alert", "confirm", "folder"):
+                raise ValueError("不支持的对话框类型")
+            fields = [body.get(k, "") for k in ("title", "message", "initial_path")]
+            if any(not isinstance(v, str) or len(v) > 16000 for v in fields):
+                raise ValueError("无效的对话框内容")
+            result = await run_in_threadpool(show_native_dialog, kind, *fields)
+            return JSONResponse(result)
+        except ValueError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
+        except Exception:
+            logging.getLogger(__name__).exception("Native dialog failed")
+            return JSONResponse({"error": "无法打开系统对话框，请检查后端程序是否运行在交互桌面"}, status_code=500)
+
     # ---- page ----
     @rt("/")
     def _home():
@@ -65,7 +96,10 @@ def register(app, rt):
     # ---- basic info ----
     @rt("/api/hardware")
     def _hardware():
-        return JSONResponse(detect_hardware())
+        info = detect_hardware()
+        model = current_model()
+        info["device_check"] = model.device_check if model else None
+        return JSONResponse(info)
 
     @rt("/api/models")
     def _models():
@@ -538,6 +572,8 @@ def register(app, rt):
             job = jobs.get(job_id)
             if not job:
                 return JSONResponse({"error": "job 不存在"}, status_code=404)
+            if job.source != "folder":
+                return JSONResponse({"error": "只有文件夹模式支持查看分类，直接拖入或上传图片不支持"}, status_code=400)
             results = job.results
         else:
             return JSONResponse(

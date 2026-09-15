@@ -112,25 +112,54 @@ def select_provider(available: List[str]) -> str:
     return "CPUExecutionProvider"
 
 
+def list_provider_gpus(provider: str) -> List[dict]:
+    """Enumerate in the selected runtime's ID namespace; never guess from WMI."""
+    try:
+        if provider == "DmlExecutionProvider":
+            from .dxgi import enumerate_adapters
+            return [g for g in enumerate_adapters()
+                    if not g["software"] and not _is_virtual_gpu(g["name"])]
+        if provider in ("CUDAExecutionProvider", "ROCMExecutionProvider"):
+            import torch
+            # torch.cuda also exposes HIP devices in a ROCm build.
+            if bool(torch.version.hip) != (provider == "ROCMExecutionProvider"):
+                return []
+            return [{"id": i, "name": torch.cuda.get_device_name(i),
+                     "memory_bytes": torch.cuda.get_device_properties(i).total_memory}
+                    for i in range(torch.cuda.device_count())]
+    except Exception:
+        log.warning("Cannot enumerate devices for %s; use automatic selection", provider,
+                    exc_info=True)
+    return []
+
+
+def largest_gpu(devices: List[dict]) -> dict | None:
+    """Prefer dedicated/total device memory, not shared system RAM; ties keep order."""
+    return max(devices, key=lambda g: g.get("memory_bytes", 0), default=None)
+
+
 def preferred_providers(available: List[str], device_id: int | None = None) -> List:
     """返回过滤后按优先级排列的 provider 列表，供 InferenceSession 使用。
 
-    device_id 指定时，DML/CUDA/ROCm provider 会以 (name, options) 形式返回，
-    绑定到指定 GPU。
+    手动 ID 只属于首选后端，不能传给其他后端使用。
     """
     chosen = [p for p in PROVIDER_PRIORITY if p in available]
     if not chosen:
-        return ["CPUExecutionProvider"]
+        chosen = ["CPUExecutionProvider"]
+    provider = chosen[0]
+    devices = list_provider_gpus(provider)
     if device_id is None:
-        return chosen
-    out: List = []
-    for name in chosen:
-        if name in ("DmlExecutionProvider", "CUDAExecutionProvider",
-                    "ROCMExecutionProvider"):
-            out.append((name, {"device_id": int(device_id)}))
-        else:
-            out.append(name)
-    return out
+        device = largest_gpu(devices)
+        if device is None:
+            if provider != "CPUExecutionProvider":
+                log.warning("GPU memory enumeration unavailable; retaining runtime default")
+            return chosen
+        device_id = device["id"]
+    if device_id not in [g["id"] for g in devices]:
+        raise ValueError("所选 GPU 不可用，请刷新页面后重新选择显卡或使用自动选择。")
+    device = next(g for g in devices if g["id"] == device_id)
+    log.info("Selected %s device_id=%s: %s", provider, device_id, device["name"])
+    return [(provider, {"device_id": int(device_id)}), "CPUExecutionProvider"]
 
 
 def detect_hardware() -> Dict[str, object]:
@@ -139,8 +168,7 @@ def detect_hardware() -> Dict[str, object]:
     info: Dict[str, object] = {
         "providers": [],
         "gpus": gpus,
-        # 每张卡带 device_id（DML/CUDA 的索引，顺序参照 wmic）
-        "gpus_indexed": [{"id": i, "name": n} for i, n in enumerate(gpus)],
+        "gpus_indexed": [],
         "selected": "CPUExecutionProvider",
         "accelerator": "CPU",
         "ok": False,
@@ -154,6 +182,8 @@ def detect_hardware() -> Dict[str, object]:
         providers = ort.get_available_providers()
         info["providers"] = providers
         info["selected"] = select_provider(providers)
+        info["gpus_indexed"] = list_provider_gpus(info["selected"])
+        info["auto_device"] = largest_gpu(info["gpus_indexed"])
         info["accelerator"] = PROVIDER_LABEL.get(info["selected"], info["selected"])
         info["ok"] = True
         log.info(
@@ -167,10 +197,9 @@ def detect_hardware() -> Dict[str, object]:
         if gpus and info["selected"] == "CPUExecutionProvider":
             log.warning(
                 "GPU detected but no GPU execution provider is available."
-                " Install a matching onnxruntime build:"
-                " onnxruntime-directml (Windows/generic GPU),"
-                " onnxruntime-gpu (NVIDIA CUDA),"
-                " onnxruntime-rocm (AMD ROCm). Current providers=%s",
+                " Sync a matching uv runtime extra:"
+                " directml (Windows/generic GPU), cuda (NVIDIA CUDA),"
+                " or cpu. Current providers=%s",
                 providers,
             )
     except Exception as e:
